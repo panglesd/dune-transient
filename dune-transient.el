@@ -1,7 +1,7 @@
 ;;; dune-transient.el --- Transient menu for OCaml Dune build system  -*- lexical-binding: t; -*-
 
 ;; Author: Gemini
-;; Version: 1.2
+;; Version: 1.3
 ;; Package-Requires: ((emacs "27.1") (transient "0.3.0"))
 ;; Keywords: ocaml, dune, build, tools
 
@@ -21,6 +21,9 @@
 
 ;;; --- Custom Variables for State ---
 
+(defvar dune-transient-target ""
+  "The current build target. Empty string implies default (project root).")
+
 (defvar dune-transient--target-history nil
   "History for custom dune targets.")
 
@@ -31,39 +34,47 @@
   (or (locate-dominating-file default-directory "dune-project")
       default-directory))
 
-(defun dune-transient--compose-command (subcommand args)
+(defun dune-transient--compose-command (subcommand flags target)
   "Construct the final shell string for compile.
-Extracts the target from ARGS (prefixed with ::target=) and removes it
-from the flags list."
-  (let* ((target-arg (cl-find-if (lambda (x) (string-prefix-p "::target=" x)) args))
-         (target (when target-arg (substring target-arg 9))) ;; Remove "::target=" prefix
-         (clean-args (cl-remove-if (lambda (x) (string-prefix-p "::target=" x)) args))
-         (cmd (concat "dune " subcommand " " (mapconcat 'identity clean-args " "))))
+SUBCOMMAND: The dune command (e.g., build, runtest).
+FLAGS: List of enabled flags (e.g., --watch).
+TARGET: The positional target argument."
+  (let ((cmd (concat "dune " subcommand " " (mapconcat 'identity flags " "))))
+    ;; Append target if it is not empty
     (if (and target (not (string-empty-p target)))
         (concat cmd " " target)
       cmd)))
 
 ;;; --- Custom Infixes ---
 
+(defclass dune-transient-target-variable (transient-variable)
+  ((variable :initform 'dune-transient-target))
+  "Class for handling the Dune target variable.")
+
 (transient-define-infix dune-transient-set-target ()
-  "Set the build target (positional argument)."
-  :description "Target"
+  "Set the build target variable."
+  :class 'dune-transient-target-variable
   :key "T"
-  :argument "::target="
+  ;; Dynamic description to show current state
+  :description (lambda () 
+                 (format "Target [%s]" 
+                         (if (string-empty-p dune-transient-target) 
+                             "Default" 
+                           dune-transient-target)))
   :reader (lambda (_prompt _history _initial)
-            (let ((choice (read-string "Target (empty for default, . for current): " 
-                                       nil 'dune-transient--target-history)))
-              choice)))
+            (read-string "Target (empty for default, . for current): " 
+                         nil 'dune-transient--target-history)))
 
 ;;; --- Suffixes (Actions) ---
 
 (defun dune-transient--run (subcommand)
   "Run the dune SUBCOMMAND with current arguments and target."
   (interactive)
-  (let* ((args (transient-args 'dune-transient))
+  (let* ((flags (transient-args 'dune-transient))
          (root (dune-transient--get-root))
          (default-directory root)
-         (cmd (dune-transient--compose-command subcommand args)))
+         ;; Explicitly use the global variable for the target
+         (cmd (dune-transient--compose-command subcommand flags dune-transient-target)))
     (compile cmd)))
 
 (transient-define-suffix dune-transient-build ()
