@@ -17,7 +17,7 @@ It was built entirely by an AI. I was only in charge of copy-pasting various
 bits of inscrutable text from one place to the other.
 
 As a consequence, I'm afraid this project cannot accept contributions made by
-humans. The AI might find it rude and start malfunctionning. You are however
+humans. We need to wait a bit before humans are reliable enough. You are however
 welcome to open PR, provided both the PR text and the code in it has been
 written by an AI, without human review.
 
