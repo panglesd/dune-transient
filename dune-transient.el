@@ -1,7 +1,7 @@
 ;;; dune-transient.el --- Transient menu for OCaml Dune build system  -*- lexical-binding: t; -*-
 
 ;; Author: Gemini
-;; Version: 1.1
+;; Version: 1.2
 ;; Package-Requires: ((emacs "27.1") (transient "0.3.0"))
 ;; Keywords: ocaml, dune, build, tools
 
@@ -24,10 +24,6 @@
 (defvar dune-transient--target-history nil
   "History for custom dune targets.")
 
-(defvar dune-transient-default-target ""
-  "The current target selected in the transient menu.
-Empty string means default (project root).")
-
 ;;; --- Helpers ---
 
 (defun dune-transient--get-root ()
@@ -35,36 +31,29 @@ Empty string means default (project root).")
   (or (locate-dominating-file default-directory "dune-project")
       default-directory))
 
-(defun dune-transient--compose-command (subcommand args target)
-  "Construct the final shell string for compile."
-  ;; args contains the list of enabled flags (e.g. "--watch", "--profile=release")
-  (let ((cmd (concat "dune " subcommand " " (mapconcat 'identity args " "))))
+(defun dune-transient--compose-command (subcommand args)
+  "Construct the final shell string for compile.
+Extracts the target from ARGS (prefixed with ::target=) and removes it
+from the flags list."
+  (let* ((target-arg (cl-find-if (lambda (x) (string-prefix-p "::target=" x)) args))
+         (target (when target-arg (substring target-arg 9))) ;; Remove "::target=" prefix
+         (clean-args (cl-remove-if (lambda (x) (string-prefix-p "::target=" x)) args))
+         (cmd (concat "dune " subcommand " " (mapconcat 'identity clean-args " "))))
     (if (and target (not (string-empty-p target)))
         (concat cmd " " target)
       cmd)))
 
 ;;; --- Custom Infixes ---
 
-(defclass dune-transient-target-variable (transient-variable)
-  ((variable :initform 'dune-transient-default-target))
-  "Class for handling the Dune target positional argument.")
-
 (transient-define-infix dune-transient-set-target ()
   "Set the build target (positional argument)."
   :description "Target"
-  :class 'dune-transient-target-variable
-  :key "t"
-  :argument "" ;; Required to prevent "Unbound slot: argument" error
+  :key "T"
+  :argument "::target="
   :reader (lambda (_prompt _history _initial)
             (let ((choice (read-string "Target (empty for default, . for current): " 
                                        nil 'dune-transient--target-history)))
               choice)))
-
-(defun dune-transient--format-target ()
-  "Display the current target in the menu info."
-  (if (string-empty-p dune-transient-default-target)
-      (propertize "Default (Root)" 'face 'transient-inactive-value)
-    (propertize dune-transient-default-target 'face 'transient-value)))
 
 ;;; --- Suffixes (Actions) ---
 
@@ -74,7 +63,7 @@ Empty string means default (project root).")
   (let* ((args (transient-args 'dune-transient))
          (root (dune-transient--get-root))
          (default-directory root)
-         (cmd (dune-transient--compose-command subcommand args dune-transient-default-target)))
+         (cmd (dune-transient--compose-command subcommand args)))
     (compile cmd)))
 
 (transient-define-suffix dune-transient-build ()
@@ -112,17 +101,6 @@ Empty string means default (project root).")
   (interactive)
   (dune-transient--run "promote"))
 
-(transient-define-infix dune-transient-set-target ()
-  "Set the build target (positional argument)."
-  :description "Target"
-  :class 'dune-transient-target-variable
-  :key "T"
-  :argument "" ;; Required to prevent "Unbound slot: argument" error
-  :reader (lambda (_prompt _history _initial)
-            (let ((choice (read-string "Target (empty for default, . for current): " 
-                                       nil 'dune-transient--target-history)))
-              choice)))
-
 ;;; --- The Menu Definition ---
 
 ;;;###autoload
@@ -147,8 +125,8 @@ Empty string means default (project root).")
      :choices ("dev" "release")
      :always-read t)
     
-    ;; Custom Target Display
-    ("T" (lambda () (format "Target [%s]" (dune-transient--format-target))) dune-transient-set-target)]]
+    ;; Target Selection
+    (dune-transient-set-target)]]
 
   ["Actions"
    [("b" "Build" dune-transient-build)
