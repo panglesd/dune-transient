@@ -1,7 +1,7 @@
 ;;; dune-transient.el --- Transient menu for OCaml Dune build system  -*- lexical-binding: t; -*-
 
 ;; Author: Gemini
-;; Version: 8.0
+;; Version: 9.0
 ;; Package-Requires: ((emacs "27.1") (transient "0.3.0"))
 ;; Keywords: ocaml, dune, build, tools
 
@@ -112,7 +112,7 @@ Otherwise, it runs in the project root."
     (dune-transient-infix-target)]
 
    ["Execute"
-    ("b" "Run (Default)" dune-transient-run-default)
+    ("b" "Run" dune-transient-run-default)
     ("." "Run in dir..." dune-transient-run-in-dir)]])
 
 ;;; --- Panel 2: Build Configuration ---
@@ -131,20 +131,21 @@ Otherwise, it runs in the project root."
     (dune-transient-infix-target)]
    
    ["Aliases"
-    ( "a" "all"         "@all")
-    ( "c" "check"       "@check")
-    ( "d" "doc"         "@doc")
     ( "D" "default"     "@default")
+    ( "c" "check"       "@check")
+    ( "r" "runtest"     "@runtest")
+    ( "I" "install"     "@install")
+    ( "a" "all"         "@all"         :level 5)
+    ;; Advanced Aliases (Level 5 - Hidden by default. Show with C-x l)
+    ( "d" "doc"         "@doc")
     ( "f" "fmt"         "@fmt")
     ( "i" "index"       "@ocaml-index")
-    ( "I" "install"     "@install")
-    ( "r" "runtest"     "@runtest")
-    ( "j" "doc-json"    "@doc-json")
-    ( "n" "doc-new"     "@doc-new")
-    ( "k" "pkg-install" "@pkg-install")]]
+    ( "j" "doc-json"    "@doc-json"    :level 5)
+    ( "n" "doc-new"     "@doc-new"     :level 5)
+    ( "k" "pkg-install" "@pkg-install" :level 5)]]
 
   ["Execute"
-   [("b" "Run (Default)" dune-transient-run-default)
+   [("b" "Run" dune-transient-run-default)
     ("." "Run in dir..." dune-transient-run-in-dir)]])
 
 ;;; --- Panel 1: Main Menu Actions ---
@@ -152,7 +153,7 @@ Otherwise, it runs in the project root."
 (transient-define-suffix dune-transient-open-build ()
   "Open the configuration panel for 'dune build'."
   :description "Build Config..."
-  :key "b"
+  :key "B"
   (interactive)
   (setq dune-transient--active-command "build")
   (setq dune-transient--active-menu 'dune-transient-config-menu)
@@ -161,7 +162,7 @@ Otherwise, it runs in the project root."
 (transient-define-suffix dune-transient-open-test ()
   "Open the configuration panel for 'dune runtest'."
   :description "Test Config..."
-  :key "t"
+  :key "T"
   (interactive)
   (setq dune-transient--active-command "runtest")
   (setq dune-transient--active-menu 'dune-transient-test-menu)
@@ -170,7 +171,7 @@ Otherwise, it runs in the project root."
 (transient-define-suffix dune-transient-quick-build ()
   "Run 'dune build' immediately."
   :description "Quick Build"
-  :key "B"
+  :key "b"
   (interactive)
   (let ((default-directory (dune-transient--get-root)))
     (compile "dune build")))
@@ -178,7 +179,7 @@ Otherwise, it runs in the project root."
 (transient-define-suffix dune-transient-quick-test ()
   "Run 'dune runtest' immediately."
   :description "Quick Test"
-  :key "T"
+  :key "t"
   (interactive)
   (let ((default-directory (dune-transient--get-root)))
     (compile "dune runtest")))
@@ -186,7 +187,7 @@ Otherwise, it runs in the project root."
 (transient-define-suffix dune-transient-quick-watch ()
   "Run watch mode on default and index."
   :description "Watch Mode"
-  :key "W"
+  :key "w"
   (interactive)
   (let ((default-directory (dune-transient--get-root)))
     (compile "dune build -w @default @ocaml-index")))
