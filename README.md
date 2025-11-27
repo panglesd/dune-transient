@@ -2,6 +2,12 @@
 
 This brings a transient to emacs to easily compile your dune project within emacs.
 
+> ```
+> ;; Usage:
+> ;; 1. Load this file: (load "path/to/dune-transient.el")
+> ;; 2. M-x dune-transient
+> ```
+
 ![](main_panel.png)
 
 The transient has easy key-bindings for everyday tasks, and also allows you to
