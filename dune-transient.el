@@ -1,7 +1,7 @@
 ;;; dune-transient.el --- Transient menu for OCaml Dune build system  -*- lexical-binding: t; -*-
 
 ;; Author: Gemini
-;; Version: 6.0
+;; Version: 7.0
 ;; Package-Requires: ((emacs "27.1") (transient "0.3.0"))
 ;; Keywords: ocaml, dune, build, tools
 
@@ -22,7 +22,10 @@
 ;;; --- Global State ---
 
 (defvar dune-transient--active-command nil
-  "Stores the active command ('build' or 'runtest') for the configuration menu.")
+  "Stores the active command ('build' or 'runtest').")
+
+(defvar dune-transient--active-menu nil
+  "Stores the symbol of the active transient menu to pull args from.")
 
 (defvar dune-transient--target-history nil
   "History for custom dune targets.")
@@ -45,7 +48,7 @@
   "Execute the active command with current transient flags and TARGET.
 If SPECIFIC-DIR is provided, the command runs in that directory.
 Otherwise, it runs in the project root."
-  (let* ((flags (transient-args 'dune-transient-config-menu))
+  (let* ((flags (transient-args dune-transient--active-menu))
          (root (dune-transient--get-root))
          (work-dir (or specific-dir root))
          (default-directory work-dir)
@@ -55,7 +58,7 @@ Otherwise, it runs in the project root."
                target)))
     (compile cmd)))
 
-;;; --- Panel 2: Configuration & Execution Actions ---
+;;; --- Common Execution Suffixes ---
 
 (transient-define-suffix dune-transient-run-default ()
   "Run the command without a specific target."
@@ -80,11 +83,26 @@ Otherwise, it runs in the project root."
   (let ((target (read-string "Target: " nil 'dune-transient--target-history)))
     (dune-transient--run-final target)))
 
+;;; --- Panel 3: Test Menu ---
+
+(transient-define-prefix dune-transient-test-menu ()
+  "Panel 3: Test Configuration."
+  [:description "Test Configuration"
+   
+   ["Flags"
+    ("-a" "Auto Promote" "--auto-promote")
+    ("-w" "Watch mode"   "--watch")]
+
+   ["Execute"
+    ("b" "Run (Default)" dune-transient-run-default)
+    ("." "Run in dir..." dune-transient-run-in-dir)
+    ("t" "Specify Target" dune-transient-run-custom)]])
+
+;;; --- Panel 2: Build Configuration ---
+
 (transient-define-prefix dune-transient-config-menu ()
-  "Panel 2: Configuration and Execution."
-  [:description
-   (lambda ()
-     (format "Configure %s" (propertize (or dune-transient--active-command "Build") 'face 'transient-heading)))
+  "Panel 2: Build Configuration and Execution."
+  [:description "Build Configuration"
    
    ["Flags"
     ("-a" "Auto Promote" "--auto-promote")
@@ -116,19 +134,45 @@ Otherwise, it runs in the project root."
 
 (transient-define-suffix dune-transient-open-build ()
   "Open the configuration panel for 'dune build'."
-  :description "Build..."
+  :description "Build Config..."
   :key "b"
   (interactive)
   (setq dune-transient--active-command "build")
+  (setq dune-transient--active-menu 'dune-transient-config-menu)
   (dune-transient-config-menu))
 
 (transient-define-suffix dune-transient-open-test ()
   "Open the configuration panel for 'dune runtest'."
-  :description "Test..."
+  :description "Test Config..."
   :key "t"
   (interactive)
   (setq dune-transient--active-command "runtest")
-  (dune-transient-config-menu))
+  (setq dune-transient--active-menu 'dune-transient-test-menu)
+  (dune-transient-test-menu))
+
+(transient-define-suffix dune-transient-quick-build ()
+  "Run 'dune build' immediately."
+  :description "Quick Build"
+  :key "B"
+  (interactive)
+  (let ((default-directory (dune-transient--get-root)))
+    (compile "dune build")))
+
+(transient-define-suffix dune-transient-quick-test ()
+  "Run 'dune runtest' immediately."
+  :description "Quick Test"
+  :key "T"
+  (interactive)
+  (let ((default-directory (dune-transient--get-root)))
+    (compile "dune runtest")))
+
+(transient-define-suffix dune-transient-quick-watch ()
+  "Run watch mode on default and index."
+  :description "Watch Mode"
+  :key "W"
+  (interactive)
+  (let ((default-directory (dune-transient--get-root)))
+    (compile "dune build -w @default @ocaml-index")))
 
 (transient-define-suffix dune-transient-simple-fmt ()
   "Run 'dune fmt' immediately."
@@ -174,9 +218,14 @@ Otherwise, it runs in the project root."
       "\n"
       (propertize (format "Root: %s" (dune-transient--get-root)) 'face 'font-lock-comment-face)))
    
-   ["Core Commands"
-    ("b" "Build..." dune-transient-open-build)
-    ("t" "Test..."  dune-transient-open-test)]
+   ["Quick Actions"
+    ("B" "Build" dune-transient-quick-build)
+    ("T" "Test"  dune-transient-quick-test)
+    ("W" "Watch" dune-transient-quick-watch)]
+
+   ["Configuration"
+    ("b" "Build Config..." dune-transient-open-build)
+    ("t" "Test Config..."  dune-transient-open-test)]
 
    ["Utilities"
     ("f" "Format"  dune-transient-simple-fmt)
