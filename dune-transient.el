@@ -1,7 +1,7 @@
 ;;; dune-transient.el --- Transient menu for OCaml Dune build system  -*- lexical-binding: t; -*-
 
 ;; Author: Gemini
-;; Version: 4.0
+;; Version: 5.0
 ;; Package-Requires: ((emacs "27.1") (transient "0.3.0"))
 ;; Keywords: ocaml, dune, build, tools
 
@@ -56,14 +56,14 @@
 
 (transient-define-suffix dune-transient-run-default ()
   "Run the command without a specific target."
-  :description (lambda () (format "Build (Default)" )) 
+  :description (lambda () (format "Run (Default)" )) 
   :key "b"
   (interactive)
   (dune-transient--run-final nil))
 
 (transient-define-suffix dune-transient-run-dot ()
   "Run the command on the current directory (.)."
-  :description "Build in current dir (.)"
+  :description "Run in current dir (.)"
   :key "."
   (interactive)
   (dune-transient--run-final "."))
@@ -75,28 +75,6 @@
   (interactive)
   (let ((target (read-string "Target: " nil 'dune-transient--target-history)))
     (dune-transient--run-final target)))
-
-(transient-define-suffix dune-transient-run-index ()
-  "Run 'dune build @ocaml-index'."
-  :description "Build @ocaml-index"
-  :key "i"
-  (interactive)
-  (let* ((flags (transient-args 'dune-transient-config-menu))
-         (root (dune-transient--get-root))
-         (default-directory root)
-         (cmd (dune-transient--compose-command "build" flags "@ocaml-index")))
-    (compile cmd)))
-
-(transient-define-suffix dune-transient-run-fmt-target ()
-  "Run 'dune build @fmt'."
-  :description "Build @fmt"
-  :key "f"
-  (interactive)
-  (let* ((flags (transient-args 'dune-transient-config-menu))
-         (root (dune-transient--get-root))
-         (default-directory root)
-         (cmd (dune-transient--compose-command "build" flags "@fmt")))
-    (compile cmd)))
 
 (transient-define-prefix dune-transient-config-menu ()
   "Panel 2: Configuration and Execution."
@@ -110,14 +88,25 @@
     ("-f" "Force"        "--force")]
    
    ["Configuration"
-    ("-p" "Profile" "--profile=" :choices ("dev" "release") :always-read t)]]
+    ("-p" "Profile" "--profile=" :choices ("dev" "release") :always-read t)]
+   
+   ["Aliases"
+    ( "a" "all"         "@all")
+    ( "c" "check"       "@check")
+    ( "d" "doc"         "@doc")
+    ( "D" "default"     "@default")
+    ( "f" "fmt"         "@fmt")
+    ( "i" "index"       "@ocaml-index")
+    ( "I" "install"     "@install")
+    ( "r" "runtest"     "@runtest")
+    ( "j" "doc-json"    "@doc-json")
+    ( "n" "doc-new"     "@doc-new")
+    ( "k" "pkg-install" "@pkg-install")]]
 
   ["Execute"
-   [("b" "Run (No Target)" dune-transient-run-default)
-    ("." "Run (.)"         dune-transient-run-dot)
-    ("t" "Specify Target"  dune-transient-run-custom)]
-   [("i" "Build @ocaml-index" dune-transient-run-index)
-    ("f" "Build @fmt"         dune-transient-run-fmt-target)]])
+   [("b" "Run (Default)" dune-transient-run-default)
+    ("." "Run (.)"       dune-transient-run-dot)
+    ("t" "Specify Target" dune-transient-run-custom)]])
 
 ;;; --- Panel 1: Main Menu Actions ---
 
