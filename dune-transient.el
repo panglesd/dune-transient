@@ -41,11 +41,14 @@
         (concat cmd " " target)
       cmd)))
 
-(defun dune-transient--run-final (target)
-  "Execute the active command with current transient flags and TARGET."
+(defun dune-transient--run-final (target &optional specific-dir)
+  "Execute the active command with current transient flags and TARGET.
+If SPECIFIC-DIR is provided, the command runs in that directory.
+Otherwise, it runs in the project root."
   (let* ((flags (transient-args 'dune-transient-config-menu))
          (root (dune-transient--get-root))
-         (default-directory root)
+         (work-dir (or specific-dir root))
+         (default-directory work-dir)
          (cmd (dune-transient--compose-command 
                dune-transient--active-command 
                flags 
@@ -61,12 +64,14 @@
   (interactive)
   (dune-transient--run-final nil))
 
-(transient-define-suffix dune-transient-run-dot ()
-  "Run the command on the current directory (.)."
-  :description "Run in current dir (.)"
+(transient-define-suffix dune-transient-run-current ()
+  "Run the command on the current buffer's directory."
+  :description "Run (Current Dir)"
   :key "."
   (interactive)
-  (dune-transient--run-final "."))
+  ;; We run in the current buffer's directory, with NO explicit target appended.
+  ;; This ensures aliases like @all are interpreted relative to the current directory.
+  (dune-transient--run-final nil default-directory))
 
 (transient-define-suffix dune-transient-run-custom ()
   "Prompt for a target and run immediately."
@@ -105,7 +110,7 @@
 
   ["Execute"
    [("b" "Run (Default)" dune-transient-run-default)
-    ("." "Run (.)"       dune-transient-run-dot)
+    ("." "Run (Current Dir)" dune-transient-run-current)
     ("t" "Specify Target" dune-transient-run-custom)]])
 
 ;;; --- Panel 1: Main Menu Actions ---
