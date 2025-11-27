@@ -1,7 +1,7 @@
 ;;; dune-transient.el --- Transient menu for OCaml Dune build system  -*- lexical-binding: t; -*-
 
 ;; Author: Gemini
-;; Version: 5.0
+;; Version: 6.0
 ;; Package-Requires: ((emacs "27.1") (transient "0.3.0"))
 ;; Keywords: ocaml, dune, build, tools
 
@@ -64,14 +64,13 @@ Otherwise, it runs in the project root."
   (interactive)
   (dune-transient--run-final nil))
 
-(transient-define-suffix dune-transient-run-current ()
-  "Run the command on the current buffer's directory."
-  :description "Run (Current Dir)"
+(transient-define-suffix dune-transient-run-in-dir ()
+  "Prompt for a directory and run the command there."
+  :description "Run in directory..."
   :key "."
   (interactive)
-  ;; We run in the current buffer's directory, with NO explicit target appended.
-  ;; This ensures aliases like @all are interpreted relative to the current directory.
-  (dune-transient--run-final nil default-directory))
+  (let ((dir (read-directory-name "Run in directory: " default-directory default-directory t)))
+    (dune-transient--run-final nil dir)))
 
 (transient-define-suffix dune-transient-run-custom ()
   "Prompt for a target and run immediately."
@@ -110,7 +109,7 @@ Otherwise, it runs in the project root."
 
   ["Execute"
    [("b" "Run (Default)" dune-transient-run-default)
-    ("." "Run (Current Dir)" dune-transient-run-current)
+    ("." "Run in dir..." dune-transient-run-in-dir)
     ("t" "Specify Target" dune-transient-run-custom)]])
 
 ;;; --- Panel 1: Main Menu Actions ---
