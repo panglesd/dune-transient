@@ -237,13 +237,13 @@ Otherwise, it runs in the project root."
       (propertize (format "Root: %s" (dune-transient--get-root)) 'face 'font-lock-comment-face)))
    
    ["Quick Actions"
-    ("B" "Build" dune-transient-quick-build)
-    ("T" "Test"  dune-transient-quick-test)
-    ("W" "Watch" dune-transient-quick-watch)]
+    ("b" "Build" dune-transient-quick-build)
+    ("t" "Test"  dune-transient-quick-test)
+    ("w" "Watch" dune-transient-quick-watch)]
 
    ["Configuration"
-    ("b" "Build Config..." dune-transient-open-build)
-    ("t" "Test Config..."  dune-transient-open-test)]
+    ("B" "Build Config..." dune-transient-open-build)
+    ("T" "Test Config..."  dune-transient-open-test)]
 
    ["Utilities"
     ("f" "Format"  dune-transient-simple-fmt)
