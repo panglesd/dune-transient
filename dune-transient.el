@@ -70,6 +70,13 @@
   (interactive)
   (dune-transient--run-final "."))
 
+(transient-define-suffix dune-transient-run-ocaml-index ()
+  "Run @ocaml-index."
+  :description "Build @ocaml-index"
+  :key "."
+  (interactive)
+  (dune-transient--run-final "@ocaml-index"))
+
 (transient-define-suffix dune-transient-run-custom ()
   "Prompt for a target and run immediately."
   :description "Specify target..."
@@ -95,7 +102,7 @@
   ["Execute"
    [("b" "Run (No Target)" dune-transient-run-default)
     ("." "Run (.)"         dune-transient-run-dot)
-    ("i" "Run (@ocaml-index)"         dune-transient-run-dot)
+    ("i" "Run (@ocaml-index)" dune-transient-run-ocaml-index)
     ("t" "Specify Target"  dune-transient-run-custom)]])
 
 ;;; --- Panel 1: Main Menu Actions ---
