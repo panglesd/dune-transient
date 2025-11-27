@@ -1,7 +1,7 @@
 ;;; dune-transient.el --- Transient menu for OCaml Dune build system  -*- lexical-binding: t; -*-
 
 ;; Author: Gemini
-;; Version: 1.4
+;; Version: 2.0
 ;; Package-Requires: ((emacs "27.1") (transient "0.3.0"))
 ;; Keywords: ocaml, dune, build, tools
 
@@ -19,10 +19,13 @@
 (require 'compile)
 (require 'cl-lib)
 
-;;; --- Custom Variables for State ---
+;;; --- Global State ---
 
-(defvar dune-transient-target ""
-  "The current build target. Empty string implies default (project root).")
+(defvar dune-transient--saved-flags nil
+  "Stores flags (profile, watch, etc.) passed from the main menu to the subcommand menu.")
+
+(defvar dune-transient--active-command nil
+  "Stores the active command ('build' or 'runtest') for the target menu.")
 
 (defvar dune-transient--target-history nil
   "History for custom dune targets.")
@@ -34,115 +37,138 @@
   (or (locate-dominating-file default-directory "dune-project")
       default-directory))
 
+(defun dune-transient--extract-target (args)
+  "Find the ::target= argument in ARGS, return its value, and return the rest."
+  (let* ((target-arg (cl-find-if (lambda (x) (string-prefix-p "::target=" x)) args))
+         (target (when target-arg (substring target-arg 9))) ;; Remove "::target="
+         (clean-args (cl-remove-if (lambda (x) (string-prefix-p "::target=" x)) args)))
+    (cons target clean-args)))
+
 (defun dune-transient--compose-command (subcommand flags target)
-  "Construct the final shell string for compile.
-SUBCOMMAND: The dune command (e.g., build, runtest).
-FLAGS: List of enabled flags (e.g., --watch).
-TARGET: The positional target argument."
+  "Construct the final shell string for compile."
   (let ((cmd (concat "dune " subcommand " " (mapconcat 'identity flags " "))))
-    ;; Append target if it is not empty
     (if (and target (not (string-empty-p target)))
         (concat cmd " " target)
       cmd)))
 
-;;; --- Custom Infixes ---
+;;; --- Target Infix ---
 
-(defclass dune-transient-target-variable (transient-variable)
-  ((variable :initform 'dune-transient-target))
-  "Class for handling the Dune target variable.")
+(defclass dune-transient-target-option (transient-option)
+  ((key :initform "t")
+   (argument :initform "::target=")
+   (description :initform "Target")
+   (reader :initform 'dune-transient--read-target))
+  "Class for the target pseudo-argument.")
 
-(transient-define-infix dune-transient-set-target ()
-  "Set the build target variable."
-  :class 'dune-transient-target-variable
-  :key "T"
-  :argument "" ;; REQUIRED: Fixes "Unbound slot: argument" error
-  ;; Dynamic description to show current state
-  :description (lambda () 
-                 (format "Target [%s]" 
-                         (if (string-empty-p dune-transient-target) 
-                             "Default" 
-                           dune-transient-target)))
-  :reader (lambda (_prompt _history _initial)
-            (read-string "Target (empty for default, . for current): " 
-                         nil 'dune-transient--target-history)))
+(defun dune-transient--read-target (prompt initial history)
+  (read-string "Target (empty for default, . for current): " 
+               nil 'dune-transient--target-history))
 
-;;; --- Suffixes (Actions) ---
+(transient-define-argument dune-transient-infix-target ()
+  :class 'dune-transient-target-option)
 
-(defun dune-transient--run (subcommand)
-  "Run the dune SUBCOMMAND with current arguments and target."
+;;; --- Sub-Menu: Target Selection ---
+
+(transient-define-prefix dune-transient-target-menu ()
+  "Sub-menu for setting the target and executing."
+  [:description
+   (lambda ()
+     (format "Configure %s" (propertize (or dune-transient--active-command "Build") 'face 'transient-heading)))
+   
+   ["Configuration"
+    (dune-transient-infix-target)]
+   
+   ["Execute"
+    ("RET" "Run" dune-transient-exec-final)
+    ;; Shortcuts to match the command name for smoother workflow (b -> b, t -> t)
+    ("b" "Run (Build)" dune-transient-exec-final :if (lambda () (string-equal dune-transient--active-command "build")))
+    ("t" "Run (Test)"  dune-transient-exec-final :if (lambda () (string-equal dune-transient--active-command "runtest")))]])
+
+(transient-define-suffix dune-transient-exec-final ()
+  "Execute the final command with saved flags and current target."
   (interactive)
-  (let* ((flags (transient-args 'dune-transient))
+  (let* ((target-args (transient-args 'dune-transient-target-menu))
+         (target-pair (dune-transient--extract-target target-args))
+         (target (car target-pair))
+         ;; We ignore other args from target menu, assuming only target is there.
+         ;; Combine saved flags (from main menu) with the target.
          (root (dune-transient--get-root))
          (default-directory root)
-         ;; Explicitly use the global variable for the target
-         (cmd (dune-transient--compose-command subcommand flags dune-transient-target)))
+         (cmd (dune-transient--compose-command 
+               dune-transient--active-command 
+               dune-transient--saved-flags 
+               target)))
     (compile cmd)))
 
-(transient-define-suffix dune-transient-build ()
-  "Run 'dune build'."
-  :description "Build"
+;;; --- Main Menu Suffixes ---
+
+(transient-define-suffix dune-transient-prepare-build ()
+  "Capture flags and open Build target menu."
+  :description "Build..."
   :key "b"
   (interactive)
-  (dune-transient--run "build"))
+  (setq dune-transient--saved-flags (transient-args 'dune-transient))
+  (setq dune-transient--active-command "build")
+  (dune-transient-target-menu))
 
-(transient-define-suffix dune-transient-test ()
-  "Run 'dune runtest'."
-  :description "Test"
+(transient-define-suffix dune-transient-prepare-test ()
+  "Capture flags and open Test target menu."
+  :description "Test..."
   :key "t"
   (interactive)
-  (dune-transient--run "runtest"))
+  (setq dune-transient--saved-flags (transient-args 'dune-transient))
+  (setq dune-transient--active-command "runtest")
+  (dune-transient-target-menu))
 
 (transient-define-suffix dune-transient-clean ()
-  "Run 'dune clean'."
+  "Run 'dune clean' immediately."
   :description "Clean"
   :key "c"
   (interactive)
-  (dune-transient--run "clean"))
+  (let ((default-directory (dune-transient--get-root)))
+    (compile "dune clean")))
 
 (transient-define-suffix dune-transient-install ()
-  "Run 'dune install'."
+  "Run 'dune install' immediately."
   :description "Install"
   :key "i"
   (interactive)
-  (dune-transient--run "install"))
+  (let* ((args (transient-args 'dune-transient))
+         (default-directory (dune-transient--get-root))
+         (cmd (concat "dune install " (mapconcat 'identity args " "))))
+    (compile cmd)))
 
 (transient-define-suffix dune-transient-promote ()
-  "Run 'dune promote'."
+  "Run 'dune promote' immediately."
   :description "Promote"
   :key "x"
   (interactive)
-  (dune-transient--run "promote"))
+  (let ((default-directory (dune-transient--get-root)))
+    (compile "dune promote")))
 
-;;; --- The Menu Definition ---
+;;; --- Main Menu Definition ---
 
 ;;;###autoload
 (transient-define-prefix dune-transient ()
-  "Transient menu for Dune."
+  "Main Transient menu for Dune."
   [:description
    (lambda ()
      (concat 
-      (propertize "Dune Command Builder" 'face 'transient-heading)
+      (propertize "Dune" 'face 'transient-heading)
       "\n"
       (propertize (format "Root: %s" (dune-transient--get-root)) 'face 'font-lock-comment-face)))
    
-   ["Flags"
+   ["Global Flags"
     ("-a" "Auto Promote" "--auto-promote")
     ("-w" "Watch mode"   "--watch")
     ("-f" "Force"        "--force")]
    
    ["Configuration"
-    ;; The user asked for -p to choose profile. 
-    ;; We provide choices: dev (default), release, or custom.
-    ("-p" "Profile" "--profile=" 
-     :choices ("dev" "release")
-     :always-read t)
-    
-    ;; Target Selection
-    (dune-transient-set-target)]]
+    ("-p" "Profile" "--profile=" :choices ("dev" "release") :always-read t)]]
 
   ["Actions"
-   [("b" "Build" dune-transient-build)
-    ("t" "Test"  dune-transient-test)]
+   [("b" "Build..." dune-transient-prepare-build)
+    ("t" "Test..."  dune-transient-prepare-test)]
    
    [("c" "Clean" dune-transient-clean)
     ("i" "Install" dune-transient-install)
