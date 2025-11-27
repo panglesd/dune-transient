@@ -1,7 +1,7 @@
 ;;; dune-transient.el --- Transient menu for OCaml Dune build system  -*- lexical-binding: t; -*-
 
 ;; Author: Gemini
-;; Version: 3.0
+;; Version: 3.1
 ;; Package-Requires: ((emacs "27.1") (transient "0.3.0"))
 ;; Keywords: ocaml, dune, build, tools
 
@@ -52,13 +52,33 @@
                target)))
     (compile cmd)))
 
+;;; --- Panel 3: Formatting Menu ---
+
+(transient-define-suffix dune-transient-run-fmt ()
+  "Execute 'dune fmt' with selected flags."
+  :description "Run"
+  :key "f"
+  (interactive)
+  (let* ((flags (transient-args 'dune-transient-fmt-menu))
+         (root (dune-transient--get-root))
+         (default-directory root)
+         (cmd (concat "dune fmt " (mapconcat 'identity flags " "))))
+    (compile cmd)))
+
+(transient-define-prefix dune-transient-fmt-menu ()
+  "Format Configuration Menu."
+  [:description "Format Options"
+   ["Flags"
+    ("-a" "Auto Promote" "--auto-promote")
+    ("-c" "Check"        "--check")]
+   ["Execute"
+    ("f" "Run fmt" dune-transient-run-fmt)]])
+
 ;;; --- Panel 2: Configuration & Execution Actions ---
 
 (transient-define-suffix dune-transient-run-default ()
   "Run the command without a specific target."
   :description (lambda () (format "Build (Default)" )) 
-  ;; We conditionally show "Build" or "Test" based on context if we wanted, 
-  ;; but 'Run' is safe. The key 'b' was requested for "Build without target".
   :key "b"
   (interactive)
   (dune-transient--run-final nil))
@@ -70,13 +90,6 @@
   (interactive)
   (dune-transient--run-final "."))
 
-(transient-define-suffix dune-transient-run-ocaml-index ()
-  "Run @ocaml-index."
-  :description "Build @ocaml-index"
-  :key "."
-  (interactive)
-  (dune-transient--run-final "@ocaml-index"))
-
 (transient-define-suffix dune-transient-run-custom ()
   "Prompt for a target and run immediately."
   :description "Specify target..."
@@ -84,6 +97,18 @@
   (interactive)
   (let ((target (read-string "Target: " nil 'dune-transient--target-history)))
     (dune-transient--run-final target)))
+
+(transient-define-suffix dune-transient-run-index ()
+  "Run 'dune build @ocaml-index'."
+  :description "Build @ocaml-index"
+  :key "i"
+  (interactive)
+  ;; We force "build" here regardless of whether we came from Test or Build menu
+  (let* ((flags (transient-args 'dune-transient-config-menu))
+         (root (dune-transient--get-root))
+         (default-directory root)
+         (cmd (dune-transient--compose-command "build" flags "@ocaml-index")))
+    (compile cmd)))
 
 (transient-define-prefix dune-transient-config-menu ()
   "Panel 2: Configuration and Execution."
@@ -102,8 +127,8 @@
   ["Execute"
    [("b" "Run (No Target)" dune-transient-run-default)
     ("." "Run (.)"         dune-transient-run-dot)
-    ("i" "Run (@ocaml-index)" dune-transient-run-ocaml-index)
-    ("t" "Specify Target"  dune-transient-run-custom)]])
+    ("t" "Specify Target"  dune-transient-run-custom)
+    ("i" "Build @ocaml-index" dune-transient-run-index)]])
 
 ;;; --- Panel 1: Main Menu Actions ---
 
@@ -122,6 +147,21 @@
   (interactive)
   (setq dune-transient--active-command "runtest")
   (dune-transient-config-menu))
+
+(transient-define-suffix dune-transient-open-fmt ()
+  "Open the configuration panel for 'dune fmt'."
+  :description "Format..."
+  :key "f"
+  (interactive)
+  (dune-transient-fmt-menu))
+
+(transient-define-suffix dune-transient-fmt-auto-promote ()
+  "Run 'dune fmt --auto-promote' immediately."
+  :description "Format (Auto-Promote)"
+  :key "F"
+  (interactive)
+  (let ((default-directory (dune-transient--get-root)))
+    (compile "dune fmt --auto-promote")))
 
 (transient-define-suffix dune-transient-simple-promote ()
   "Run 'dune promote' immediately."
@@ -161,12 +201,14 @@
    
    ["Core Commands"
     ("b" "Build..." dune-transient-open-build)
-    ("t" "Test..."  dune-transient-open-test)]
+    ("t" "Test..."  dune-transient-open-test)
+    ("f" "Format..." dune-transient-open-fmt)]
 
    ["Utilities"
     ("p" "Promote" dune-transient-simple-promote)
     ("c" "Clean"   dune-transient-simple-clean)
-    ("i" "Install" dune-transient-simple-install)]])
+    ("i" "Install" dune-transient-simple-install)
+    ("F" "Fmt (Auto)" dune-transient-fmt-auto-promote)]])
 
 (provide 'dune-transient)
 ;;; dune-transient.el ends here
