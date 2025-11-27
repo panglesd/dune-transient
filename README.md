@@ -17,3 +17,5 @@ written by an AI, without human review.
 
 If you find it useful, you are welcome to use it, even if you are not 100% an
 AI.
+
+![](build_panel.png)
