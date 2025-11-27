@@ -1,7 +1,7 @@
 ;;; dune-transient.el --- Transient menu for OCaml Dune build system  -*- lexical-binding: t; -*-
 
 ;; Author: Gemini
-;; Version: 7.0
+;; Version: 8.0
 ;; Package-Requires: ((emacs "27.1") (transient "0.3.0"))
 ;; Keywords: ocaml, dune, build, tools
 
@@ -37,6 +37,13 @@
   (or (locate-dominating-file default-directory "dune-project")
       default-directory))
 
+(defun dune-transient--extract-target (args)
+  "Find the ::target= argument in ARGS, return (target . clean-args)."
+  (let* ((target-arg (cl-find-if (lambda (x) (string-prefix-p "::target=" x)) args))
+         (target (when target-arg (substring target-arg 9))) ;; Remove "::target=" prefix
+         (clean-args (cl-remove-if (lambda (x) (string-prefix-p "::target=" x)) args)))
+    (cons target clean-args)))
+
 (defun dune-transient--compose-command (subcommand flags target)
   "Construct the final shell string for compile."
   (let ((cmd (concat "dune " subcommand " " (mapconcat 'identity flags " "))))
@@ -44,11 +51,15 @@
         (concat cmd " " target)
       cmd)))
 
-(defun dune-transient--run-final (target &optional specific-dir)
-  "Execute the active command with current transient flags and TARGET.
+(defun dune-transient--run-final (&optional specific-dir)
+  "Execute the active command with current transient flags and configured target.
 If SPECIFIC-DIR is provided, the command runs in that directory.
 Otherwise, it runs in the project root."
-  (let* ((flags (transient-args dune-transient--active-menu))
+  (let* ((raw-args (transient-args dune-transient--active-menu))
+         ;; Separate the pseudo-argument ::target= from actual flags
+         (arg-pair (dune-transient--extract-target raw-args))
+         (target (car arg-pair))
+         (flags (cdr arg-pair))
          (root (dune-transient--get-root))
          (work-dir (or specific-dir root))
          (default-directory work-dir)
@@ -58,10 +69,22 @@ Otherwise, it runs in the project root."
                target)))
     (compile cmd)))
 
+;;; --- Infixes ---
+
+(defun dune-transient--read-target (prompt initial _history)
+  (read-string prompt initial 'dune-transient--target-history))
+
+(transient-define-argument dune-transient-infix-target ()
+  :description "Target"
+  :class 'transient-option
+  :key "t"
+  :argument "::target="
+  :reader 'dune-transient--read-target)
+
 ;;; --- Common Execution Suffixes ---
 
 (transient-define-suffix dune-transient-run-default ()
-  "Run the command without a specific target."
+  "Run the command in the default context (root)."
   :description (lambda () (format "Run (Default)" )) 
   :key "b"
   (interactive)
@@ -73,15 +96,7 @@ Otherwise, it runs in the project root."
   :key "."
   (interactive)
   (let ((dir (read-directory-name "Run in directory: " default-directory default-directory t)))
-    (dune-transient--run-final nil dir)))
-
-(transient-define-suffix dune-transient-run-custom ()
-  "Prompt for a target and run immediately."
-  :description "Specify target..."
-  :key "t"
-  (interactive)
-  (let ((target (read-string "Target: " nil 'dune-transient--target-history)))
-    (dune-transient--run-final target)))
+    (dune-transient--run-final dir)))
 
 ;;; --- Panel 3: Test Menu ---
 
@@ -92,11 +107,13 @@ Otherwise, it runs in the project root."
    ["Flags"
     ("-a" "Auto Promote" "--auto-promote")
     ("-w" "Watch mode"   "--watch")]
+   
+   ["Configuration"
+    (dune-transient-infix-target)]
 
    ["Execute"
     ("b" "Run (Default)" dune-transient-run-default)
-    ("." "Run in dir..." dune-transient-run-in-dir)
-    ("t" "Specify Target" dune-transient-run-custom)]])
+    ("." "Run in dir..." dune-transient-run-in-dir)]])
 
 ;;; --- Panel 2: Build Configuration ---
 
@@ -110,7 +127,8 @@ Otherwise, it runs in the project root."
     ("-f" "Force"        "--force")]
    
    ["Configuration"
-    ("-p" "Profile" "--profile=" :choices ("dev" "release") :always-read t)]
+    ("-p" "Profile" "--profile=" :choices ("dev" "release") :always-read t)
+    (dune-transient-infix-target)]
    
    ["Aliases"
     ( "a" "all"         "@all")
@@ -127,8 +145,7 @@ Otherwise, it runs in the project root."
 
   ["Execute"
    [("b" "Run (Default)" dune-transient-run-default)
-    ("." "Run in dir..." dune-transient-run-in-dir)
-    ("t" "Specify Target" dune-transient-run-custom)]])
+    ("." "Run in dir..." dune-transient-run-in-dir)]])
 
 ;;; --- Panel 1: Main Menu Actions ---
 
