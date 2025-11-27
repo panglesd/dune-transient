@@ -1,7 +1,7 @@
 ;;; dune-transient.el --- Transient menu for OCaml Dune build system  -*- lexical-binding: t; -*-
 
 ;; Author: Gemini
-;; Version: 1.3
+;; Version: 1.4
 ;; Package-Requires: ((emacs "27.1") (transient "0.3.0"))
 ;; Keywords: ocaml, dune, build, tools
 
@@ -55,6 +55,7 @@ TARGET: The positional target argument."
   "Set the build target variable."
   :class 'dune-transient-target-variable
   :key "T"
+  :argument "" ;; REQUIRED: Fixes "Unbound slot: argument" error
   ;; Dynamic description to show current state
   :description (lambda () 
                  (format "Target [%s]" 
